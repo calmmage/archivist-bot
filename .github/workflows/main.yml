@@ -1,0 +1,55 @@
+name: Python package
+
+on: [ push ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+#        python-version: [ "3.7", "3.8", "3.9", "3.10", "3.11" ]
+#         3.7 doesn't support f"{a=}" syntax
+#        python-version: [ "3.8", "3.9", "3.10", "3.11" ]
+#         don't really need anything older than 3.10
+        python-version: [ "3.10", "3.11" ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+      - name: Configure Poetry
+        run: |
+          poetry config virtualenvs.in-project true
+      - name: Install dependencies
+        run: |
+          poetry install
+      - name: Run tests
+        run: |
+          poetry run pytest
+# Old
+#      - uses: actions/cache@v3
+#        id: cache
+#        with:
+#          path: ~/.cache/pip
+#          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.*') }}
+#          restore-keys: |
+#            ${{ runner.os }}-pip-
+#      - name: Install dependencies
+#        run: |
+#          python -m pip install --upgrade pip
+#          pip install ruff pytest
+#          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+#      #      - name: Lint with ruff
+#      #        run: |
+#      #          # stop the build if there are Python syntax errors or undefined names
+#      #          ruff --format=github --select=E9,F63,F7,F82 --target-version=py37 .
+#      #          # default set of ruff rules with GitHub Annotations
+#      #          ruff --format=github --target-version=py37 .
+#      - name: Test with pytest
+#        run: |
+#          export PYTHONPATH="$PYTHONPATH:/home/runner/work/chat_summary_bot"
+#          pytest
