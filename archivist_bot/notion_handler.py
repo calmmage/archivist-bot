@@ -52,7 +52,7 @@ class NotionHandler:
                     "object": "block",
                     "type": "paragraph",
                     "paragraph": {
-                        "text": [
+                        "rich_text": [
                             {
                                 "type": "text",
                                 "text": {
@@ -68,16 +68,12 @@ class NotionHandler:
     @staticmethod
     def _get_message_text(message):
         # Assuming that the first block is the one with the message text
-        return message["children"][0]["paragraph"]["text"][0]['text']['content']
+        return message["children"][0]["paragraph"]["rich_text"][0]['text'][
+            'content']
 
-    def save_message(self, message_text: str):
-        logger.debug("Saving message to Notion database")
-        new_page = self.compose_request(message_text)
-        self.client.pages.create(**new_page)
-        logger.debug("Message saved to Notion database")
-
-    async def save_message_async(self, message_text: str):
+    async def save_message(self, message_text: str):
         logger.debug("Saving message to Notion database asynchronously")
         new_page = self.compose_request(message_text)
-        await self.client.pages.create(**new_page)
+        self.client.pages.create(**new_page)
+        # await self.client.pages.create(**new_page)
         logger.debug("Message saved to Notion database asynchronously")

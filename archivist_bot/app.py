@@ -40,7 +40,7 @@ class App:
                                     message_text: str) -> AppResponse:
         try:
             logger.info(f"Processing message asynchronously: {message_text}")
-            await self.notion_handler.save_message_async(message_text)
+            await self.notion_handler.save_message(message_text)
             logger.info("Message saved asynchronously")
             # todo: provide message url in response
             return AppResponse(status=AppResponseStatus.SUCCESS)
