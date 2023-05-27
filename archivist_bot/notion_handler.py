@@ -32,37 +32,52 @@ class NotionHandler:
     def compose_request(self, message_text: str):
         logger.debug("Composing request for Notion database")
         return {
-            "Name": {
-                "title": [
-                    {
-                        "text": {
-                            "content": self.generate_page_title(message_text),
-                        },
-                    },
-                ],
+            "parent": {
+                "database_id": self.db_id
             },
-            "Body": {
-                "type": "text",
-                "text": {"content": message_text},
+            "properties": {
+                "Name": {
+                    "title": [
+                        {
+                            "text": {
+                                "content": self.generate_page_title(
+                                    message_text),
+                            }
+                        }
+                    ]
+                }
             },
+            "children": [
+                {
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": message_text
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
         }
 
     @staticmethod
     def _get_message_text(message):
-        # todo: replace with GPT
-        # todo: move to Notion_handler
-        return message["Body"]["text"]['content']
+        # Assuming that the first block is the one with the message text
+        return message["children"][0]["paragraph"]["text"][0]['text']['content']
 
     def save_message(self, message_text: str):
         logger.debug("Saving message to Notion database")
         new_page = self.compose_request(message_text)
-        self.client.pages.create(parent={"database_id": self.db_id},
-                                 properties=new_page)
+        self.client.pages.create(**new_page)
         logger.debug("Message saved to Notion database")
 
     async def save_message_async(self, message_text: str):
         logger.debug("Saving message to Notion database asynchronously")
         new_page = self.compose_request(message_text)
-        await self.client.pages.create(parent={"database_id": self.db_id},
-                                       properties=new_page)
+        await self.client.pages.create(**new_page)
         logger.debug("Message saved to Notion database asynchronously")
