@@ -30,7 +30,7 @@ class TestNotionHandler(unittest.TestCase):
         mock_create = MagicMock()
         mock_client.pages.create = mock_create
 
-        handler.save_message_async("test_message")
+        handler.save_message("test_message")
         mock_create.assert_called_once()
 
     @patch('notion_client.Client')
