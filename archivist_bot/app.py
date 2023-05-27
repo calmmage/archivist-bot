@@ -49,7 +49,7 @@ class App:
             return AppResponse(status=AppResponseStatus.FAILURE,
                                message=str(e))
 
-    async def get_messages_async(self, limit=None) -> List[dict]:
+    async def get_messages_async(self, limit=None) -> List[str]:
         logger.info("Retrieving messages asynchronously")
         messages = await self.notion_handler.get_messages_async(limit=limit)
         logger.info(f"{len(messages)} messages retrieved asynchronously")

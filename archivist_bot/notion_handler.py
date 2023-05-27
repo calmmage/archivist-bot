@@ -24,9 +24,11 @@ class NotionHandler:
 
     async def get_messages_async(self, limit=None):
         logger.debug("Retrieving messages from Notion database asynchronously")
-        messages = await self.client.databases.query(database_id=self.db_id,
-                                                     limit=limit)
-        return [self._get_message_text(message) for message in messages[
+        # messages = await self.client.databases.query(database_id=self.db_id,
+        #                                              limit=limit)
+        pages = self.client.databases.query(database_id=self.db_id,
+                                            limit=limit)
+        return [self._get_message_text(page) for page in pages[
             "results"]]
 
     def compose_request(self, message_text: str):
@@ -65,11 +67,17 @@ class NotionHandler:
             ]
         }
 
-    @staticmethod
-    def _get_message_text(message):
-        # Assuming that the first block is the one with the message text
-        return message["children"][0]["paragraph"]["rich_text"][0]['text'][
-            'content']
+    def _get_message_text(self, page):
+        page_id = page["id"]
+        # retrieve page content
+        response = self.client.blocks.children.list(block_id=page_id)
+        children = []
+        for child in response["results"]:
+            child_text = child["paragraph"]["rich_text"][0]['text']['content']
+            children.append(child_text)
+        title = page['properties']['Name']['title'][0]['text']['content']
+
+        return f"*{title}*\n" + "\n".join(children)
 
     async def save_message(self, message_text: str):
         logger.debug("Saving message to Notion database asynchronously")

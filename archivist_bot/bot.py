@@ -116,7 +116,10 @@ class Bot:
         peek_messages = []
         for message in messages:
             logger.debug(f"Sending peek message: {message}")
-            peek_message = await update.message.reply_text(message)
+            peek_message = await update.message.reply_text(
+                message,
+                parse_mode='Markdown'
+            )
             peek_messages.append(peek_message)
             await asyncio.sleep(1)
         logger.debug(f"Sent {len(peek_messages)} peek messages")
@@ -125,6 +128,7 @@ class Bot:
         for peek_message in peek_messages:
             await peek_message.delete()
             await asyncio.sleep(1)
+        await update.message.delete()
         logger.info("Finished /peek command execution")
 
 
