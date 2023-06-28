@@ -2,6 +2,7 @@ import asyncio
 import textwrap
 from loguru import logger
 from telegram import __version__ as TG_VER
+from typing import Union, List
 
 from archivist_bot.app import App, AppResponseStatus
 from archivist_bot.config import BotConfig
@@ -17,7 +18,7 @@ if __version_info__ < (20, 0, 0, "alpha", 1):
         f"{TG_VER} version of this example, "
         f"visit https://docs.python-telegram-bot.org/en/v{TG_VER}/examples.html"
     )
-from telegram import Update
+from telegram import Update, Message
 from telegram.ext import Application, CommandHandler, ContextTypes, \
     MessageHandler, filters
 
@@ -132,6 +133,10 @@ class Bot:
             # Notify user of failure
             await update.message.reply_text("❌ Failed to save message!")
             logger.error(f"Failed to save message: {message_text}")
+
+    @property
+    def user_filter(self):
+        return filters.User(username=f"@{self.config.telegram_user_id}")
 
     async def peek_command(self, update: Update,
                            context: ContextTypes.DEFAULT_TYPE) -> None:
