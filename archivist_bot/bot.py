@@ -40,11 +40,11 @@ class Bot:
         )
 
         self.application.add_handler(
-            MessageHandler(filters.TEXT & ~filters.COMMAND &
-                           filters.User(
-                               username=f"@{self.config.telegram_user_id}"
-                           ),
-                           self.message_handler))
+            MessageHandler((filters.TEXT | filters.PHOTO | filters.VIDEO |
+                            filters.VOICE | filters.AUDIO) & ~filters.COMMAND &
+                           self.user_filter,
+                           self.message_handler)
+        )
         logger.info("Bot initialized")
 
     @staticmethod
@@ -90,11 +90,37 @@ class Bot:
         )
         logger.info("Sent welcome message and pinned it")
 
+    @staticmethod
+    def extract_message_text(update: Update):
+        """Gracefully extract text or captions from the text"""
+        return update.message.text or update.message.caption
+
+    @staticmethod
+    def extract_message_content(update: Update):
+        """Gracefully extract text or captions from the text"""
+        content = []
+        message = update.message
+        # todo: test and handle each type correctly
+        # todo: support multiple items? How are they delivered? test.
+        if message.photo:
+            content.append(message.photo)
+        if message.video:
+            content.append(message.video)
+        if message.audio:
+            content.append(message.audio)
+        if message.voice:
+            content.append(message.voice)
+
+        return content
+
     async def message_handler(self, update: Update,
                               context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info("Processing message")
-        message_text = update.message.text
-        result = await self.app.process_message_async(message_text)
+        message_text = self.extract_message_text(update)
+        content = self.extract_message_content(update)
+        result = await self.app.process_message_async(message_text,
+                                                      content=content)  # todo:
+        # content
 
         if result.status == AppResponseStatus.SUCCESS:
             logger.info("Message saved successfully")
