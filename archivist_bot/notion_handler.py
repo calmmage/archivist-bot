@@ -31,8 +31,9 @@ class NotionHandler:
         return [self._get_message_text(page) for page in pages[
             "results"]]
 
-    def compose_request(self, message_text: str):
+    def compose_request(self, message_text: str, content_links):
         logger.debug("Composing request for Notion database")
+        # todo: add content links
         return {
             "parent": {
                 "database_id": self.db_id
@@ -68,20 +69,47 @@ class NotionHandler:
         }
 
     def _get_message_text(self, page):
-        page_id = page["id"]
-        # retrieve page content
-        response = self.client.blocks.children.list(block_id=page_id)
+        children = self._load_blocks(page["id"])
+        return self._construct_text(page, children)
+
+    def _load_blocks(self, block_id, depth=0, max_depth=10):
+        if depth > max_depth:
+            return []
+
+        response = self.client.blocks.children.list(block_id=block_id)
         children = []
         for child in response["results"]:
-            child_text = child["paragraph"]["rich_text"][0]['text']['content']
-            children.append(child_text)
-        title = page['properties']['Name']['title'][0]['text']['content']
+            child_item = child.get("paragraph", {}).get("rich_text")
+            if child_item:
+                child_text = child_item[0]['text']['content']
+            else:
+                child_text = ""
+            child_blocks = self._load_blocks(child["id"], depth=depth + 1,
+                                             max_depth=max_depth)
+            children.append((child_text, child_blocks))
 
-        return f"*{title}*\n" + "\n".join(children)
+        return children
 
-    async def save_message(self, message_text: str):
+    def _construct_text(self, page, children, depth=0, sep="  "):
+        if isinstance(page, str):
+            # This is a leaf node
+            text = sep * depth + page
+        elif "properties" in page:
+            title = page['properties']['Name']['title'][0]['text'][
+                'content']
+            text = sep * depth + f"*{title}*\n" if title else ""
+        else:
+            text = ""
+
+        for child, subchildren in children:
+            text += self._construct_text(child, subchildren, depth=depth + 1,
+                                         sep=sep)
+
+        return text
+
+    async def save_message(self, message_text: str, content_links: list = None):
         logger.debug("Saving message to Notion database asynchronously")
-        new_page = self.compose_request(message_text)
+        new_page = self.compose_request(message_text, content_links)
         self.client.pages.create(**new_page)
         # await self.client.pages.create(**new_page)
         logger.debug("Message saved to Notion database asynchronously")
