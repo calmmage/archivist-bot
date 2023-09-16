@@ -1,8 +1,9 @@
 import asyncio
 import textwrap
+from typing import Union, List
+
 from loguru import logger
 from telegram import __version__ as TG_VER
-from typing import Union, List
 
 from archivist_bot.app import App, AppResponseStatus
 from archivist_bot.config import BotConfig
@@ -18,7 +19,7 @@ if __version_info__ < (20, 0, 0, "alpha", 1):
         f"{TG_VER} version of this example, "
         f"visit https://docs.python-telegram-bot.org/en/v{TG_VER}/examples.html"
     )
-from telegram import Update, Message
+from telegram import Update, Message, File
 from telegram.ext import Application, CommandHandler, ContextTypes, \
     MessageHandler, filters
 
@@ -32,12 +33,15 @@ class Bot:
         self.application = Application.builder().token(token).post_init(
             self.post_init).build()
 
+        self.commands = [
+            ("start", "Start the bot"),
+            ("peek", "Peek at the last saved messages")
+        ]
+
         self.application.add_handler(
             CommandHandler("start", self.start_command))
         self.application.add_handler(
-            CommandHandler("peek", self.peek_command,
-                           filters.User(
-                               username=f"@{self.config.telegram_user_id}"))
+            CommandHandler("peek", self.peek_command, self.user_filter)
         )
 
         self.application.add_handler(
@@ -48,12 +52,8 @@ class Bot:
         )
         logger.info("Bot initialized")
 
-    @staticmethod
-    async def post_init(application: Application):
-        await application.bot.set_my_commands([
-            ("start", "Start the bot"),
-            ("peek", "Peek at the last saved messages")
-        ])
+    async def post_init(self, application: Application):
+        await application.bot.set_my_commands(self.commands)
 
     def run(self):
         logger.info("Starting Bot")
@@ -97,38 +97,35 @@ class Bot:
         return update.message.text or update.message.caption
 
     @staticmethod
-    def extract_message_content(update: Update):
+    async def extract_message_content(update: Update) -> File:
         """Gracefully extract text or captions from the text"""
-        content = []
         message = update.message
         # todo: test and handle each type correctly
         # todo: support multiple items? How are they delivered? test.
         if message.photo:
-            content.append(message.photo)
+            return await message.photo[1].get_file()
         if message.video:
-            content.append(message.video)
+            return await message.video.get_file()
         if message.audio:
-            content.append(message.audio)
+            return await message.audio.get_file()
         if message.voice:
-            content.append(message.voice)
-
-        return content
+            return await message.voice.get_file()
+        return None
 
     async def message_handler(self, update: Update,
                               context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info("Processing message")
         message_text = self.extract_message_text(update)
-        content = self.extract_message_content(update)
+        content = await self.extract_message_content(update)
+        content_links = [content._get_encoded_url() if content else None]
         result = await self.app.process_message_async(message_text,
-                                                      content=content)  # todo:
+                                                      content_links)  # todo:
         # content
 
         if result.status == AppResponseStatus.SUCCESS:
             logger.info("Message saved successfully")
             temp_message = await update.message.reply_text("🍾 Message saved!")
-            await asyncio.sleep(self.config.delete_timeout)
-            await update.message.delete()
-            await temp_message.delete()
+            await self.cleanup([update.message, temp_message])
         else:
             # Notify user of failure
             await update.message.reply_text("❌ Failed to save message!")
@@ -154,13 +151,52 @@ class Bot:
             peek_messages.append(peek_message)
             await asyncio.sleep(1)
         logger.debug(f"Sent {len(peek_messages)} peek messages")
-        await asyncio.sleep(self.config.peek_timeout)
-
-        for peek_message in peek_messages:
-            await peek_message.delete()
-            await asyncio.sleep(1)
+        await self.cleanup(peek_messages, self.config.peek_timeout)
         await update.message.delete()
         logger.info("Finished /peek command execution")
+
+    async def cleanup(self, msgs: Union[Message, List[Message]], timeout=None):
+        if timeout is None:
+            timeout = self.config.delete_timeout
+        await asyncio.sleep(timeout)
+        if not isinstance(msgs, list):
+            msgs = [msgs]
+        for msg in msgs:
+            await msg.delete()
+
+    def setup_config_commands(self):
+        for attribute in ["peek_timeout", "peek_count", "delete_timeout"]:
+            for action in ["set", "get"]:
+                key = f"{action}_{attribute}"
+                self.commands.append(
+                    (key, f"{action} the {attribute} config attribute")
+                )
+                command = self.config_int_attribute_command(attribute, action)
+                self.application.add_handler(
+                    CommandHandler(key, command, self.user_filter)
+                )
+
+    def config_int_attribute_command(self, attribute, action):
+        async def command(update: Update, context) -> None:
+            logger.info(f"Received /{action}_{attribute} command")
+            if action == "set":
+                try:
+                    val = int(context.args[0])
+                    setattr(self.config, attribute, val)
+                    msg = await update.message.reply_text(
+                        f"{attribute} is set to {val}"
+                    )
+                    logger.info(f"{attribute} is set to {val}")
+                    await self.cleanup(msg)
+                except (IndexError, ValueError):
+                    # todo: make a conversation to request a new value
+                    msg = await update.message.reply_text(
+                        "Please specify a valid int attribute value"
+                    )
+                    await self.cleanup(msg)
+                    return
+
+        return command
 
 
 if __name__ == '__main__':

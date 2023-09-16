@@ -1,7 +1,8 @@
 from enum import Enum
+from typing import List
+
 from loguru import logger
 from pydantic import BaseModel
-from typing import List
 
 from .config import AppConfig
 from .notion_handler import NotionHandler
@@ -37,11 +38,12 @@ class App:
         return "Message saved"
 
     async def process_message_async(
-            self, message_text: str, content=None
+            self, message_text: str, content_links=None
     ) -> AppResponse:
         try:
             logger.info(f"Processing message asynchronously: {message_text}")
-            await self.notion_handler.save_message(message_text)
+            await self.notion_handler.save_message(message_text,
+                                                   content_links=content_links)
             logger.info("Message saved asynchronously")
             # todo: provide message (notion) url in response?
             # todo: forward messages to sanctuary somewhere? And links there
